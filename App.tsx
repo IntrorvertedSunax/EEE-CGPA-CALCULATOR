@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Header from './components/Header';
 import SgpaCalculator from './components/SgpaCalculator';
 import CgpaCalculator from './components/CgpaCalculator';
+import ConfirmationModal from './components/ConfirmationModal';
 
 type View = 'sgpa' | 'cgpa';
 
@@ -17,6 +18,7 @@ interface CgpaState {
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<View>('sgpa');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [sgpaState, setSgpaState] = useState<SgpaState>(() => {
     try {
@@ -73,6 +75,12 @@ const App: React.FC = () => {
     }
   }, [activeView]);
 
+  const handleClearAllData = () => {
+    setSgpaState({ selectedSemesterKey: '', grades: {} });
+    setCgpaState({ gpas: {} });
+    setIsModalOpen(false);
+  };
+
   return (
     <div className="min-h-screen text-neutral-800 dark:text-neutral-200 relative">
       <div className="absolute top-0 left-0 -z-10 h-full w-full bg-neutral-50 dark:bg-neutral-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.2),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(0,0,0,0))]"></div>
@@ -125,7 +133,22 @@ const App: React.FC = () => {
       </main>
       <footer className="text-center py-10 mt-12 text-neutral-500 dark:text-neutral-400 text-sm">
         <p>Developed with passion by Introverted Sunax</p>
+        <button
+         onClick={() => setIsModalOpen(true)}
+         className="mt-4 text-sm font-medium text-red-600 dark:text-red-500 hover:text-red-800 dark:hover:text-red-400 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 focus:ring-red-500/50 rounded-md px-2 py-1 transition-colors"
+       >
+         Clear All Data
+       </button>
       </footer>
+
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleClearAllData}
+        title="Confirm Data Deletion"
+      >
+        Are you sure you want to clear all your saved SGPA and CGPA data? This action cannot be undone.
+      </ConfirmationModal>
     </div>
   );
 };
