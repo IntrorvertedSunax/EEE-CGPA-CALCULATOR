@@ -19,7 +19,7 @@ const SgpaDisplay: React.FC<SgpaDisplayProps> = ({ sgpa, offeredCredits, secured
     };
 
     const baseCardClasses = "transition-all duration-300 ease-in-out";
-    const glassEffectClasses = "bg-white/60 dark:bg-neutral-900/60 backdrop-blur-xl border border-white/20 dark:border-neutral-800/80 shadow-lg";
+    const glassEffectClasses = "bg-white/70 dark:bg-neutral-900/70 backdrop-blur-xl border border-neutral-200/50 dark:border-neutral-800/50 shadow-xl shadow-neutral-300/10 dark:shadow-black/20";
 
     if (isSticky) {
         return (

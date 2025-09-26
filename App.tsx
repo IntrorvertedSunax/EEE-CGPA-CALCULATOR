@@ -74,13 +74,15 @@ const App: React.FC = () => {
   }, [activeView]);
 
   return (
-    <div className="min-h-screen text-neutral-800 dark:text-neutral-200">
+    <div className="min-h-screen text-neutral-800 dark:text-neutral-200 relative">
+      <div className="absolute top-0 left-0 -z-10 h-full w-full bg-neutral-50 dark:bg-neutral-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.2),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(0,0,0,0))]"></div>
+
       <Header />
       <main className="container mx-auto px-4 py-6 sm:py-12">
         <div className="flex justify-center mb-8">
-          <div className="relative flex p-1 bg-neutral-200/60 dark:bg-neutral-900/60 backdrop-blur-sm rounded-xl shadow-inner-lg" role="tablist">
+          <div className="relative flex p-1 bg-neutral-200/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-xl shadow-md border border-white/50 dark:border-neutral-800/50" role="tablist">
             <span 
-                className="absolute top-1 bottom-1 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] bg-white dark:bg-neutral-800 rounded-lg shadow-md"
+                className="absolute top-1 bottom-1 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] bg-white dark:bg-neutral-800 rounded-lg shadow-sm"
                 style={gliderStyle}
                 aria-hidden="true"
             ></span>

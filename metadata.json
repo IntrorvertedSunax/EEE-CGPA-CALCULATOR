@@ -1,6 +1,6 @@
 {
   "name": "Interactive GPA & CGPA Calculator",
-  "description": "A versatile calculator for students. Choose to calculate your Semester GPA (SGPA) by entering grades for individual courses, or calculate your overall CGPA by inputting your GPA for each semester.",
+  "description": "A versatile calculator for students. Calculate your Semester GPA (SGPA) or overall CGPA, and get AI-powered analysis and feedback on your academic performance.",
   "requestFramePermissions": [],
   "prompt": ""
 }

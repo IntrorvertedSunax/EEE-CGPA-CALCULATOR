@@ -1,9 +1,13 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { GoogleGenAI } from '@google/genai';
 import { SEMESTER_COURSES } from '../constants';
 import CgpaDisplay from './CgpaDisplay';
 import DownloadIcon from './icons/DownloadIcon';
+import AiAnalysis from './AiAnalysis';
+import SparklesIcon from './icons/SparklesIcon';
 
 const semesterCreditMap = Object.fromEntries(
     Object.entries(SEMESTER_COURSES).map(([key, courses]) => [
@@ -28,6 +32,10 @@ const CgpaCalculator: React.FC<CgpaCalculatorProps> = ({ cgpaState, setCgpaState
     const [isSticky, setIsSticky] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     const displayElementRef = useRef<HTMLDivElement>(null);
+
+    const [analysis, setAnalysis] = useState('');
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisError, setAnalysisError] = useState<string | null>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -87,6 +95,54 @@ const CgpaCalculator: React.FC<CgpaCalculatorProps> = ({ cgpaState, setCgpaState
         const cgpa = totalCredits > 0 ? totalPoints / totalCredits : 0;
         return { cgpa, totalCredits, totalPoints };
     }, [gpas]);
+
+     const handleAnalyze = async () => {
+        if (cgpaData.totalCredits === 0) return;
+
+        setIsAnalyzing(true);
+        setAnalysisError(null);
+        setAnalysis('');
+
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const semesterData = semesterKeys
+                .map(key => {
+                    const gpa = gpas[key];
+                    if (gpa && parseFloat(gpa) > 0) {
+                        return `- Semester ${key}: GPA ${parseFloat(gpa).toFixed(3)}`;
+                    }
+                    return null;
+                })
+                .filter(Boolean)
+                .join('\n');
+            
+            const prompt = `You are an academic advisor bot. Analyze the following student's overall academic performance based on their semester GPAs.
+The current calculated CGPA is ${cgpaData.cgpa.toFixed(3)} over ${cgpaData.totalCredits.toFixed(2)} credits.
+
+Semester-wise GPAs:
+${semesterData}
+
+Your analysis should:
+1. Provide a brief summary of the overall academic standing based on the CGPA.
+2. Identify any trends in performance (e.g., improving, declining, consistent).
+3. Offer 2-3 specific, actionable strategies for maintaining momentum or improving future results.
+4. Keep the tone positive, motivating, and helpful for long-term planning.
+5. Format the response clearly with paragraphs. Do not use markdown like bold, headers, or lists.`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+            });
+            
+            setAnalysis(response.text);
+
+        } catch (err) {
+            console.error(err);
+            setAnalysisError('Failed to get analysis. Please check your connection or API key and try again.');
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     const handleDownloadPdf = () => {
         if (cgpaData.totalCredits === 0) return;
@@ -174,7 +230,7 @@ const CgpaCalculator: React.FC<CgpaCalculatorProps> = ({ cgpaState, setCgpaState
 
     const canTakeAction = cgpaData.totalCredits > 0;
     const cardBaseClasses = "transition-all duration-300 ease-in-out";
-    const glassEffectClasses = "bg-white/60 dark:bg-neutral-900/60 backdrop-blur-xl border border-white/20 dark:border-neutral-800/80 shadow-lg";
+    const glassEffectClasses = "bg-white/70 dark:bg-neutral-900/70 backdrop-blur-xl border border-neutral-200/50 dark:border-neutral-800/50 shadow-xl shadow-neutral-300/10 dark:shadow-black/20";
 
     return (
         <section className={`transition-all duration-500 ease-out ${isMounted ? 'opacity-100 transform-none' : 'opacity-0 translate-y-4'}`}>
@@ -186,7 +242,7 @@ const CgpaCalculator: React.FC<CgpaCalculatorProps> = ({ cgpaState, setCgpaState
                 />
             </div>
 
-            <div className={`fixed top-0 left-0 right-0 z-20 py-4 ${glassEffectClasses} transition-all duration-300 ease-in-out ${isSticky ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}`}>
+            <div className={`fixed top-0 left-0 right-0 z-20 py-4 bg-neutral-50/80 dark:bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-200/80 dark:border-neutral-800/80 transition-all duration-300 ease-in-out ${isSticky ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}`}>
                 <CgpaDisplay 
                     cgpa={cgpaData.cgpa} 
                     totalCredits={cgpaData.totalCredits}
@@ -198,7 +254,7 @@ const CgpaCalculator: React.FC<CgpaCalculatorProps> = ({ cgpaState, setCgpaState
                 <div className={`mt-8 ${cardBaseClasses} ${glassEffectClasses} rounded-2xl p-4 sm:p-6`}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                         {semesterKeys.map((key, index) => (
-                            <div key={key} className="flex items-center justify-between gap-4 p-2 rounded-lg transition-colors hover:bg-neutral-500/10">
+                            <div key={key} className="flex items-center justify-between gap-4 p-3 rounded-lg transition-colors hover:bg-neutral-500/10">
                                 <div>
                                     <p className="font-semibold text-neutral-800 dark:text-neutral-100">Semester {key}</p>
                                     <p className="text-sm text-neutral-500 dark:text-neutral-400">{semesterCreditMap[key]} Credits</p>
@@ -220,15 +276,26 @@ const CgpaCalculator: React.FC<CgpaCalculatorProps> = ({ cgpaState, setCgpaState
                 </div>
 
                  {canTakeAction && (
-                    <div className="mt-8 text-center">
-                        <button
-                            onClick={handleDownloadPdf}
-                            className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 focus:ring-neutral-500/70 transition-all duration-300 bg-neutral-700 text-white shadow-lg hover:shadow-neutral-500/40 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                        >
-                            <DownloadIcon />
-                            Download Report
-                        </button>
-                    </div>
+                    <>
+                        <AiAnalysis analysis={analysis} isLoading={isAnalyzing} error={analysisError} />
+                        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                           <button
+                                onClick={handleAnalyze}
+                                disabled={isAnalyzing}
+                                className="inline-flex items-center justify-center gap-2.5 px-6 py-3 font-semibold text-white rounded-lg w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 focus:ring-primary-500/70 transition-all duration-300 bg-gradient-to-r from-primary-600 to-primary-500 shadow-lg hover:shadow-primary-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                            >
+                                <SparklesIcon />
+                                {isAnalyzing ? 'Analyzing...' : 'Analyze Performance'}
+                            </button>
+                            <button
+                                onClick={handleDownloadPdf}
+                                className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-lg w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 focus:ring-neutral-500/70 transition-all duration-300 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 shadow-md hover:shadow-lg hover:bg-neutral-300 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                            >
+                                <DownloadIcon />
+                                Download Report
+                            </button>
+                        </div>
+                    </>
                 )}
             </div>
         </section>

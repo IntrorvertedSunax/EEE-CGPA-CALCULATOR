@@ -1,10 +1,14 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { GoogleGenAI } from '@google/genai';
 import { Course } from '../types';
 import { SEMESTER_COURSES, GRADE_POINTS, GRADE_OPTIONS } from '../constants';
 import SgpaDisplay from './SgpaDisplay';
 import DownloadIcon from './icons/DownloadIcon';
+import AiAnalysis from './AiAnalysis';
+import SparklesIcon from './icons/SparklesIcon';
 
 interface SgpaCalculatorProps {
   sgpaState: {
@@ -22,6 +26,10 @@ const SgpaCalculator: React.FC<SgpaCalculatorProps> = ({ sgpaState, setSgpaState
   const [isSticky, setIsSticky] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const displayElementRef = useRef<HTMLDivElement>(null);
+
+  const [analysis, setAnalysis] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -90,6 +98,55 @@ const SgpaCalculator: React.FC<SgpaCalculatorProps> = ({ sgpaState, setSgpaState
         selectedSemesterKey: newSemesterKey,
         grades: {}
       });
+      setAnalysis('');
+      setAnalysisError(null);
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedSemesterKey || courses.length === 0 || semesterStats.attemptedCredits === 0) return;
+    
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysis('');
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const courseData = courses
+            .map(course => {
+                const grade = grades[course.code] || 'N/A';
+                if (grade === 'N/A') return null;
+                return `- ${course.name} (${course.credits} credits): Grade ${grade}`;
+            })
+            .filter(Boolean)
+            .join('\n');
+        
+        const prompt = `You are an academic advisor bot. Analyze the following student's performance for Semester ${selectedSemesterKey} and provide constructive feedback.
+The overall GPA for this semester is ${semesterStats.sgpa.toFixed(3)}.
+
+Course results:
+${courseData}
+
+Your analysis should:
+1. Start with a brief, encouraging summary of the overall performance.
+2. Highlight the subjects where the student performed well.
+3. Gently point out subjects that might need more attention, without being discouraging.
+4. Offer 2-3 specific, actionable study tips or strategies for improvement.
+5. Keep the tone positive, motivating, and helpful.
+6. Format the response clearly with paragraphs. Do not use markdown like bold, headers, or lists.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        
+        setAnalysis(response.text);
+
+    } catch (err) {
+        console.error(err);
+        setAnalysisError('Failed to get analysis. Please check your connection or API key and try again.');
+    } finally {
+        setIsAnalyzing(false);
+    }
   };
 
   const handleDownloadPdf = () => {
@@ -187,7 +244,7 @@ const SgpaCalculator: React.FC<SgpaCalculatorProps> = ({ sgpaState, setSgpaState
 
   const canTakeAction = semesterStats.attemptedCredits > 0;
   const cardBaseClasses = "transition-all duration-300 ease-in-out";
-  const glassEffectClasses = "bg-white/60 dark:bg-neutral-900/60 backdrop-blur-xl border border-white/20 dark:border-neutral-800/80 shadow-lg";
+  const glassEffectClasses = "bg-white/70 dark:bg-neutral-900/70 backdrop-blur-xl border border-neutral-200/50 dark:border-neutral-800/50 shadow-xl shadow-neutral-300/10 dark:shadow-black/20";
 
   return (
     <section className={`transition-all duration-500 ease-out ${isMounted ? 'opacity-100 transform-none' : 'opacity-0 translate-y-4'}`}>
@@ -201,7 +258,7 @@ const SgpaCalculator: React.FC<SgpaCalculatorProps> = ({ sgpaState, setSgpaState
             />
         </div>
 
-        <div className={`fixed top-0 left-0 right-0 z-20 py-4 ${glassEffectClasses} transition-all duration-300 ease-in-out ${isSticky ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}`}>
+        <div className={`fixed top-0 left-0 right-0 z-20 py-4 bg-neutral-50/80 dark:bg-neutral-950/80 backdrop-blur-lg border-b border-neutral-200/80 dark:border-neutral-800/80 transition-all duration-300 ease-in-out ${isSticky ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}`}>
             <SgpaDisplay 
                 sgpa={semesterStats.sgpa}
                 offeredCredits={semesterStats.offeredCredits}
@@ -217,7 +274,7 @@ const SgpaCalculator: React.FC<SgpaCalculatorProps> = ({ sgpaState, setSgpaState
                      <select
                       value={selectedSemesterKey}
                       onChange={handleSemesterChange}
-                      className="w-full max-w-sm bg-white/50 dark:bg-neutral-800/50 border border-neutral-300 dark:border-neutral-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary-500/80 focus:border-primary-500 outline-none transition"
+                      className="w-full max-w-sm bg-white/50 dark:bg-neutral-800/50 border border-neutral-300 dark:border-neutral-700 rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-primary-500/80 focus:border-primary-500 outline-none transition"
                     >
                       <option value="">Select a Semester</option>
                       {Object.keys(SEMESTER_COURSES).map(key => (
@@ -260,15 +317,26 @@ const SgpaCalculator: React.FC<SgpaCalculatorProps> = ({ sgpaState, setSgpaState
             </div>
 
             {canTakeAction && (
-                <div className="mt-8 text-center">
+              <>
+                <AiAnalysis analysis={analysis} isLoading={isAnalyzing} error={analysisError} />
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <button
+                        onClick={handleAnalyze}
+                        disabled={isAnalyzing}
+                        className="inline-flex items-center justify-center gap-2.5 px-6 py-3 font-semibold text-white rounded-lg w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 focus:ring-primary-500/70 transition-all duration-300 bg-gradient-to-r from-primary-600 to-primary-500 shadow-lg hover:shadow-primary-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                    >
+                        <SparklesIcon />
+                        {isAnalyzing ? 'Analyzing...' : 'Analyze Performance'}
+                    </button>
                     <button
                         onClick={handleDownloadPdf}
-                        className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 focus:ring-neutral-500/70 transition-all duration-300 bg-neutral-700 text-white shadow-lg hover:shadow-neutral-500/40 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold rounded-lg w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-neutral-950 focus:ring-neutral-500/70 transition-all duration-300 bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100 shadow-md hover:shadow-lg hover:bg-neutral-300 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
                         <DownloadIcon />
                         Download Report
                     </button>
                 </div>
+              </>
             )}
         </div>
     </section>
