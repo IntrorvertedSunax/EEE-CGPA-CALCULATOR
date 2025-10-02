@@ -19,6 +19,29 @@ interface CgpaState {
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<View>('sgpa');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const userPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && userPrefersDark)) {
+      return 'dark';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [theme]);
+
+  const handleThemeToggle = () => {
+    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+  };
 
   const [sgpaState, setSgpaState] = useState<SgpaState>(() => {
     try {
@@ -85,7 +108,7 @@ const App: React.FC = () => {
     <div className="min-h-screen text-neutral-800 dark:text-neutral-200 relative">
       <div className="absolute top-0 left-0 -z-10 h-full w-full bg-neutral-50 dark:bg-neutral-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.2),rgba(255,255,255,0))] dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(0,0,0,0))]"></div>
 
-      <Header />
+      <Header theme={theme} onToggleTheme={handleThemeToggle} />
       <main className="container mx-auto px-4 py-6 sm:py-12">
         <div className="flex justify-center mb-8">
           <div className="relative flex p-1 bg-neutral-200/80 dark:bg-neutral-900/80 backdrop-blur-md rounded-xl shadow-md border border-white/50 dark:border-neutral-800/50" role="tablist">
